@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AMAX — предзаказ телефонов</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    --text: var(--tg-theme-text-color, #111111);
+    --hint: var(--tg-theme-hint-color, #8a8f98);
+    --accent: var(--tg-theme-button-color, #2481cc);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --sep: color-mix(in srgb, var(--hint) 25%, transparent);
+    --danger: #e5484d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.tg) { --bg: #17191c; --bg2: #0f1113; --text: #eceef1; --hint: #8b9199; --accent: #3e9be8; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg2); color: var(--text);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--bg2); padding: 12px 16px 8px; }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .sub { color: var(--hint); font-size: 13px; }
+  .closed { margin-top: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px;
+    background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .search { width: 100%; margin-top: 10px; padding: 9px 12px; border: 0; border-radius: 10px;
+    background: var(--bg); color: var(--text); font-size: 15px; outline: none; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; padding: 6px 12px; border-radius: 16px; border: 0; background: var(--bg);
+    color: var(--text); font-size: 13px; cursor: pointer; }
+  .chip.on { background: var(--accent); color: var(--accent-text); }
+  main { padding: 0 16px 120px; }
+  .group { margin-top: 14px; }
+  .group h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+    color: var(--hint); margin: 0 0 6px 4px; }
+  .card { background: var(--bg); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 11px 12px; }
+  .row + .row { border-top: 1px solid var(--sep); }
+  .info { flex: 1; min-width: 0; }
+  .name { overflow-wrap: anywhere; }
+  .price { color: var(--hint); font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .add, .step button { border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer;
+    border-radius: 9px; font-size: 15px; font-weight: 600; }
+  .add { padding: 7px 14px; }
+  .step { display: flex; align-items: center; gap: 2px; }
+  .step button { width: 32px; height: 32px; }
+  .step span { min-width: 26px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .empty { text-align: center; color: var(--hint); padding: 40px 0; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg); border-top: 1px solid var(--sep); display: none; }
+  .bar button { width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--accent);
+    color: var(--accent-text); font-size: 16px; font-weight: 600; cursor: pointer; }
+  .bar .note { text-align: center; color: var(--hint); font-size: 12px; margin-top: 6px; }
+  body.tg .bar button { display: none; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Телефоны из Дубая</h1>
+  <div class="sub" id="sub">Загружаю каталог…</div>
+  <div class="closed" id="closed" hidden>Приём заказов закрыт — каталог для ознакомления.</div>
+  <input class="search" id="q" type="search" placeholder="Поиск: S26, 512, Black…" autocomplete="off">
+  <div class="chips" id="brands"></div>
+  <div class="chips" id="mems"></div>
+</div>
+<main id="list"></main>
+<div class="bar" id="bar"><button id="go"></button><div class="note" id="note"></div></div>
+
+<script>
+(() => {
+  const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
+  const $ = id => document.getElementById(id);
+  const gb = m => parseInt(m) * (/TB/.test(m) ? 1024 : 1);
+  const rub = n =>n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
+  let cat = null, cart = {}, brand = "", mem = "", q = "";
+
+  if (tg) { document.documentElement.classList.add("tg"); document.body.classList.add("tg"); tg.ready(); tg.expand(); }
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* без памяти — не страшно */ } },
+  };
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function chips(box, values, current, set) {
+    box.replaceChildren();
+    if (values.length < 2) return;
+    ["", ...values].forEach(v => {
+      const b = el("button", "chip" + (v === current ? " on" : ""), v || "Все");
+      b.onclick = () => { set(v); render(); };
+      box.append(b);
+    });
+  }
+
+  function total() {
+    let qty = 0, sum = 0;
+    for (const it of cat.items) { const n = cart[it.id] || 0; qty += n; sum += n * it.price; }
+    return { qty, sum, prepay: Math.ceil(sum * cat.prepay_pct / 100 / 100) * 100 };
+  }
+
+  function setQty(id, n) {
+    if (n <= 0) delete cart[id]; else cart[id] = Math.min(n, 50);
+    store.set("cart:" + cat.v, cart);
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+    render();
+  }
+
+  function render() {
+    chips($("brands"), [...new Set(cat.items.map(i => i.brand))], brand, v => brand = v);
+    chips($("mems"), [...new Set(cat.items.map(i => i.mem).filter(Boolean))].sort((a, b) => gb(a) - gb(b)),
+          mem, v => mem = v);
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = cat.items.filter(i => (!brand || i.brand === brand) && (!mem || i.mem === mem)
+      && words.every(w => i.name.toLowerCase().includes(w)));
+    const list = $("list"); list.replaceChildren();
+    if (!shown.length) list.append(el("div", "empty", cat.items.length ? "Ничего не нашлось" : "Каталог пока пуст"));
+    const groups = {};
+    shown.forEach(i => (groups[i.brand] = groups[i.brand] || []).push(i));
+    for (const [b, items] of Object.entries(groups)) {
+      const g = el("section", "group"); g.append(el("h2", null, b));
+      const card = el("div", "card");
+      items.forEach(it => {
+        const row = el("div", "row"), info = el("div", "info");
+        info.append(el("div", "name", it.name), el("div", "price", rub(it.price)));
+        row.append(info);
+        const n = cart[it.id] || 0;
+        if (!cat.accepting) { /* только смотреть */ }
+        else if (!n) { const a = el("button", "add", "+"); a.onclick = () => setQty(it.id, 1); row.append(a); }
+        else {
+          const s = el("div", "step"), minus = el("button", null, "−"), plus = el("button", null, "+");
+          minus.onclick = () => setQty(it.id, n - 1); plus.onclick = () => setQty(it.id, n + 1);
+          s.append(minus, el("span", null, String(n)), plus); row.append(s);
+        }
+        card.append(row);
+      });
+      g.append(card); list.append(g);
+    }
+    const t = total();
+    const label = t.qty ? `Оформить · ${t.qty} шт · ${rub(t.sum)}` : "";
+    $("note").textContent = t.qty ? `Предоплата ${cat.prepay_pct} % ≈ ${rub(t.prepay)} наличными ${cat.deadline}` : "";
+    $("bar").style.display = t.qty ? "block" : "none";
+    $("go").textContent = label;
+    if (tg) { if (t.qty) { tg.MainButton.setText(label); tg.MainButton.show(); } else tg.MainButton.hide(); }
+  }
+
+  function submit() {
+    const t = total();
+    if (!t.qty) return;
+    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [Number(id), n]) });
+    const text = `Оформить заказ на ${rub(t.sum)}?\nПредоплата ${rub(t.prepay)} наличными ${cat.deadline}.`;
+    if (!tg) { alert("Предпросмотр вне Telegram.\n\n" + text + "\n\n" + payload); return; }
+    tg.showConfirm(text, ok => {
+      if (!ok) return;
+      store.set("cart:" + cat.v, {});
+      tg.sendData(payload);  // бот получает заказ, окно закрывается
+    });
+  }
+
+  $("go").onclick = submit;
+  if (tg) tg.MainButton.onClick(submit);
+  $("q").oninput = e => { q = e.target.value; render(); };
+
+  fetch("catalog.json?t=" + Date.now()).then(r => r.json()).then(data => {
+    cat = data;
+    cart = store.get("cart:" + cat.v) || {};
+    const ids = new Set(cat.items.map(i => i.id));
+    for (const id of Object.keys(cart)) if (!ids.has(Number(id))) delete cart[id];
+    $("sub").textContent = `Каталог от ${cat.updated} · ${cat.items.length} поз. · предоплата ${cat.prepay_pct} %`;
+    $("closed").hidden = !!cat.accepting;
+    render();
+  }).catch(() => { $("sub").textContent = "Не удалось загрузить каталог. Откройте ещё раз или выберите «📋 Каталог списком» в боте."; });
+})();
+</script>
+</body>
+</html>
