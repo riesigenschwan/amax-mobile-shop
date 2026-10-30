@@ -1,0 +1,1 @@
+# amax-mobile-shop
