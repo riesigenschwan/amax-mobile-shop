@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>AMAX — предзаказ телефонов</title>
+<title>AMAX Mobile</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
@@ -15,6 +15,7 @@
     --accent-text: var(--tg-theme-button-text-color, #ffffff);
     --sep: color-mix(in srgb, var(--hint) 25%, transparent);
     --danger: #e5484d;
+    --ok: #2f9e5b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not(.tg) { --bg: #17191c; --bg2: #0f1113; --text: #eceef1; --hint: #8b9199; --accent: #3e9be8; }
@@ -23,18 +24,23 @@
   html, body { margin: 0; background: var(--bg2); color: var(--text);
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   .top { position: sticky; top: 0; z-index: 5; background: var(--bg2); padding: 12px 16px 8px; }
-  h1 { font-size: 20px; margin: 0 0 2px; }
-  .sub { color: var(--hint); font-size: 13px; }
+  .tabs { display: flex; gap: 4px; padding: 3px; border-radius: 11px; background: var(--bg); }
+  .tab { flex: 1; padding: 8px 6px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .tab.on { background: var(--accent); color: var(--accent-text); }
+  .tab small { font-weight: 400; opacity: .75; }
+  .sub { color: var(--hint); font-size: 13px; margin-top: 8px; }
   .closed { margin-top: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px;
     background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
-  .search { width: 100%; margin-top: 10px; padding: 9px 12px; border: 0; border-radius: 10px;
+  .search { width: 100%; margin-top: 8px; padding: 9px 12px; border: 0; border-radius: 10px;
     background: var(--bg); color: var(--text); font-size: 15px; outline: none; }
-  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; scrollbar-width: none; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 0; scrollbar-width: none; }
+  .chips:empty { display: none; }
   .chips::-webkit-scrollbar { display: none; }
   .chip { flex: none; padding: 6px 12px; border-radius: 16px; border: 0; background: var(--bg);
     color: var(--text); font-size: 13px; cursor: pointer; }
   .chip.on { background: var(--accent); color: var(--accent-text); }
-  main { padding: 0 16px 120px; }
+  main { padding: 0 16px 130px; }
   .group { margin-top: 14px; }
   .group h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
     color: var(--hint); margin: 0 0 6px 4px; }
@@ -44,11 +50,14 @@
   .info { flex: 1; min-width: 0; }
   .name { overflow-wrap: anywhere; }
   .price { color: var(--hint); font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .price b { color: var(--text); font-weight: 600; }
+  .have { color: var(--ok); }
   .add, .step button { border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer;
     border-radius: 9px; font-size: 15px; font-weight: 600; }
   .add { padding: 7px 14px; }
   .step { display: flex; align-items: center; gap: 2px; }
   .step button { width: 32px; height: 32px; }
+  .step button:disabled { opacity: .35; cursor: default; }
   .step span { min-width: 26px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
   .empty { text-align: center; color: var(--hint); padding: 40px 0; }
   .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
@@ -61,11 +70,11 @@
 </head>
 <body>
 <div class="top">
-  <h1>Телефоны из Дубая</h1>
+  <div class="tabs" id="tabs"></div>
   <div class="sub" id="sub">Загружаю каталог…</div>
-  <div class="closed" id="closed" hidden>Приём заказов закрыт — каталог для ознакомления.</div>
+  <div class="closed" id="closed" hidden>Приём предзаказов закрыт — каталог для ознакомления.</div>
   <input class="search" id="q" type="search" placeholder="Поиск: S26, 512, Black…" autocomplete="off">
-  <div class="chips" id="brands"></div>
+  <div class="chips" id="groups"></div>
   <div class="chips" id="mems"></div>
 </div>
 <main id="list"></main>
@@ -76,8 +85,9 @@
   const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
   const $ = id => document.getElementById(id);
   const gb = m => parseInt(m) * (/TB/.test(m) ? 1024 : 1);
-  const rub = n =>n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
-  let cat = null, cart = {}, brand = "", mem = "", q = "";
+  const rub = n => n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
+  const TABS = { stock: "В наличии", pre: "Предзаказ" };
+  let cat = null, cart = {}, byId = {}, tab = "", group = "", mem = "", q = "";
 
   if (tg) { document.documentElement.classList.add("tg"); document.body.classList.add("tg"); tg.ready(); tg.expand(); }
 
@@ -93,6 +103,10 @@
     return e;
   }
 
+  const items = t => t === "stock" ? cat.stock : cat.items;
+  const maxQty = it => it.qty != null ? it.qty : 50;  // в наличии — не больше остатка
+  const saveCart = () => store.set("cart", { v: cat.v, items: cart });
+
   function chips(box, values, current, set) {
     box.replaceChildren();
     if (values.length < 2) return;
@@ -103,66 +117,98 @@
     });
   }
 
-  function total() {
-    let qty = 0, sum = 0;
-    for (const it of cat.items) { const n = cart[it.id] || 0; qty += n; sum += n * it.price; }
-    return { qty, sum, prepay: Math.ceil(sum * cat.prepay_pct / 100 / 100) * 100 };
+  function totals() {
+    const t = { qty: 0, sum: 0, pre: 0, stock: 0 };
+    for (const [id, n] of Object.entries(cart)) {
+      const it = byId[id]; if (!it) continue;
+      t.qty += n; t.sum += n * it.price; t[id[0] === "s" ? "stock" : "pre"] += n * it.price;
+    }
+    t.prepay = Math.ceil(t.pre * cat.prepay_pct / 100 / 100) * 100;
+    return t;
   }
 
   function setQty(id, n) {
-    if (n <= 0) delete cart[id]; else cart[id] = Math.min(n, 50);
-    store.set("cart:" + cat.v, cart);
+    if (n <= 0) delete cart[id]; else cart[id] = Math.min(n, maxQty(byId[id]));
+    saveCart();
     if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
     render();
   }
 
+  function setTab(t) { tab = t; group = ""; mem = ""; store.set("tab", t); render(); window.scrollTo(0, 0); }
+
+  function renderTabs() {
+    const box = $("tabs"); box.replaceChildren();
+    for (const [t, label] of Object.entries(TABS)) {
+      const inCart = Object.keys(cart).filter(id => (id[0] === "s") === (t === "stock")).length;
+      const b = el("button", "tab" + (t === tab ? " on" : ""), label + " ");
+      b.append(el("small", null, inCart ? `· в корзине ${inCart}` : `· ${items(t).length}`));
+      b.onclick = () => setTab(t);
+      box.append(b);
+    }
+  }
+
+  function row(it) {
+    const r = el("div", "row"), info = el("div", "info"), price = el("div", "price");
+    price.append(el("b", null, rub(it.price)));
+    if (it.qty != null) price.append(" · ", el("span", "have", it.qty >= 10 ? "в наличии 10+" : `в наличии ${it.qty} шт`));
+    info.append(el("div", "name", it.name), price);
+    r.append(info);
+    const n = cart[it.id] || 0;
+    const canOrder = tab === "stock" || cat.accepting;
+    if (!canOrder) return r;  // только смотреть
+    if (!n) { const a = el("button", "add", "+"); a.onclick = () => setQty(it.id, 1); r.append(a); return r; }
+    const s = el("div", "step"), minus = el("button", null, "−"), plus = el("button", null, "+");
+    minus.onclick = () => setQty(it.id, n - 1); plus.onclick = () => setQty(it.id, n + 1);
+    plus.disabled = n >= maxQty(it);
+    s.append(minus, el("span", null, String(n)), plus); r.append(s);
+    return r;
+  }
+
   function render() {
-    chips($("brands"), [...new Set(cat.items.map(i => i.brand))], brand, v => brand = v);
-    chips($("mems"), [...new Set(cat.items.map(i => i.mem).filter(Boolean))].sort((a, b) => gb(a) - gb(b)),
+    renderTabs();
+    const all = items(tab);
+    $("sub").textContent = tab === "stock"
+      ? `Москва, самовывоз, без предоплаты` + (cat.stock_updated ? ` · обновлено ${cat.stock_updated}` : "")
+      : `Под заказ из Дубая · предоплата ${cat.prepay_pct} %` + (cat.updated ? ` · каталог от ${cat.updated}` : "");
+    $("closed").hidden = tab !== "pre" || !!cat.accepting || !all.length;
+    chips($("groups"), [...new Set(all.map(i => i.group))], group, v => { group = v; mem = ""; });
+    const inGroup = all.filter(i => !group || i.group === group);
+    chips($("mems"), [...new Set(inGroup.map(i => i.mem).filter(Boolean))].sort((a, b) => gb(a) - gb(b)),
           mem, v => mem = v);
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const shown = cat.items.filter(i => (!brand || i.brand === brand) && (!mem || i.mem === mem)
-      && words.every(w => i.name.toLowerCase().includes(w)));
+    const shown = inGroup.filter(i => (!mem || i.mem === mem) && words.every(w => i.name.toLowerCase().includes(w)));
     const list = $("list"); list.replaceChildren();
-    if (!shown.length) list.append(el("div", "empty", cat.items.length ? "Ничего не нашлось" : "Каталог пока пуст"));
+    if (!shown.length) list.append(el("div", "empty", all.length ? "Ничего не нашлось"
+      : tab === "stock" ? "Сейчас в наличии ничего нет" : "Каталог предзаказа пока не опубликован"));
     const groups = {};
-    shown.forEach(i => (groups[i.brand] = groups[i.brand] || []).push(i));
-    for (const [b, items] of Object.entries(groups)) {
-      const g = el("section", "group"); g.append(el("h2", null, b));
-      const card = el("div", "card");
-      items.forEach(it => {
-        const row = el("div", "row"), info = el("div", "info");
-        info.append(el("div", "name", it.name), el("div", "price", rub(it.price)));
-        row.append(info);
-        const n = cart[it.id] || 0;
-        if (!cat.accepting) { /* только смотреть */ }
-        else if (!n) { const a = el("button", "add", "+"); a.onclick = () => setQty(it.id, 1); row.append(a); }
-        else {
-          const s = el("div", "step"), minus = el("button", null, "−"), plus = el("button", null, "+");
-          minus.onclick = () => setQty(it.id, n - 1); plus.onclick = () => setQty(it.id, n + 1);
-          s.append(minus, el("span", null, String(n)), plus); row.append(s);
-        }
-        card.append(row);
-      });
-      g.append(card); list.append(g);
+    shown.forEach(i => (groups[i.group] = groups[i.group] || []).push(i));
+    for (const [g, list_] of Object.entries(groups)) {
+      const sec = el("section", "group"); sec.append(el("h2", null, g));
+      const card = el("div", "card"); list_.forEach(it => card.append(row(it)));
+      sec.append(card); list.append(sec);
     }
-    const t = total();
+    const t = totals();
     const label = t.qty ? `Оформить · ${t.qty} шт · ${rub(t.sum)}` : "";
-    $("note").textContent = t.qty ? `Предоплата ${cat.prepay_pct} % ≈ ${rub(t.prepay)} наличными ${cat.deadline}` : "";
+    $("note").textContent = !t.qty ? "" : t.pre
+      ? `Предоплата за предзаказ ${cat.prepay_pct} % ≈ ${rub(t.prepay)} наличными ${cat.deadline}`
+      : "Из наличия — без предоплаты, самовывоз в Москве";
     $("bar").style.display = t.qty ? "block" : "none";
     $("go").textContent = label;
     if (tg) { if (t.qty) { tg.MainButton.setText(label); tg.MainButton.show(); } else tg.MainButton.hide(); }
   }
 
   function submit() {
-    const t = total();
+    const t = totals();
     if (!t.qty) return;
-    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [Number(id), n]) });
-    const text = `Оформить заказ на ${rub(t.sum)}?\nПредоплата ${rub(t.prepay)} наличными ${cat.deadline}.`;
+    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [id, n]) });
+    const parts = [];
+    if (t.stock) parts.push(`В наличии: ${rub(t.stock)} — резерв, без предоплаты.`);
+    if (t.pre) parts.push(`Предзаказ: ${rub(t.pre)} — предоплата ${rub(t.prepay)} наличными ${cat.deadline}.`);
+    const text = `Оформить заказ на ${rub(t.sum)}?\n` + parts.join("\n");
     if (!tg) { alert("Предпросмотр вне Telegram.\n\n" + text + "\n\n" + payload); return; }
     tg.showConfirm(text, ok => {
       if (!ok) return;
-      store.set("cart:" + cat.v, {});
+      cart = {}; saveCart();
       tg.sendData(payload);  // бот получает заказ, окно закрывается
     });
   }
@@ -173,11 +219,16 @@
 
   fetch("catalog.json?t=" + Date.now()).then(r => r.json()).then(data => {
     cat = data;
-    cart = store.get("cart:" + cat.v) || {};
-    const ids = new Set(cat.items.map(i => i.id));
-    for (const id of Object.keys(cart)) if (!ids.has(Number(id))) delete cart[id];
-    $("sub").textContent = `Каталог от ${cat.updated} · ${cat.items.length} поз. · предоплата ${cat.prepay_pct} %`;
-    $("closed").hidden = !!cat.accepting;
+    cat.items = cat.items || []; cat.stock = cat.stock || [];
+    [...cat.items, ...cat.stock].forEach(i => byId[i.id] = i);
+    const saved = store.get("cart") || {};
+    for (const [id, n] of Object.entries(saved.items || {})) {
+      const it = byId[id];
+      // предзаказ из старого каталога не переносим; наличие — в пределах остатка
+      if (it && (id[0] === "s" || saved.v === cat.v)) cart[id] = Math.min(n, maxQty(it));
+    }
+    const want = store.get("tab");
+    tab = TABS[want] ? want : (cat.stock.length || !cat.items.length ? "stock" : "pre");
     render();
   }).catch(() => { $("sub").textContent = "Не удалось загрузить каталог. Откройте ещё раз или выберите «📋 Каталог списком» в боте."; });
 })();
