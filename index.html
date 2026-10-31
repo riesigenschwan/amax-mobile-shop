@@ -51,7 +51,6 @@
   .name { overflow-wrap: anywhere; }
   .price { color: var(--hint); font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .price b { color: var(--text); font-weight: 600; }
-  .have { color: var(--ok); }
   .add, .step button { border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer;
     border-radius: 9px; font-size: 15px; font-weight: 600; }
   .add { padding: 7px 14px; }
@@ -186,7 +185,6 @@
   function row(it) {
     const r = el("div", "row"), info = el("div", "info"), price = el("div", "price");
     price.append(el("b", null, rub(it.price)));
-    if (it.qty != null) price.append(" · ", el("span", "have", it.qty >= 10 ? "в наличии 10+" : `в наличии ${it.qty} шт`));
     info.append(el("div", "name", it.name), price);
     r.append(info);
     const n = cart[it.id] || 0;
