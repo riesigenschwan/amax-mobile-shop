@@ -62,10 +62,17 @@
   .empty { text-align: center; color: var(--hint); padding: 40px 0; }
   .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     background: var(--bg); border-top: 1px solid var(--sep); display: none; }
-  .bar button { width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--accent);
+  #go { width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--accent);
     color: var(--accent-text); font-size: 16px; font-weight: 600; cursor: pointer; }
   .bar .note { text-align: center; color: var(--hint); font-size: 12px; margin-top: 6px; }
-  body.tg .bar button { display: none; }
+  body.tg #go { display: none; }
+  .title { font-size: 20px; font-weight: 700; padding: 2px 4px 0; }
+  .pick { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+  .pick::-webkit-scrollbar { display: none; }
+  .pick span { flex: none; color: var(--hint); font-size: 13px; }
+  .pick .chip { background: var(--bg2); }
+  .pick .chip.on { background: var(--accent); }
+  body.tg .pick { padding-bottom: 0; }
 </style>
 </head>
 <body>
@@ -78,7 +85,7 @@
   <div class="chips" id="mems"></div>
 </div>
 <main id="list"></main>
-<div class="bar" id="bar"><button id="go"></button><div class="note" id="note"></div></div>
+<div class="bar" id="bar"><div class="pick" id="pick" hidden></div><button id="go"></button><div class="note" id="note"></div></div>
 
 <script>
 (() => {
@@ -87,7 +94,11 @@
   const gb = m => parseInt(m) * (/TB/.test(m) ? 1024 : 1);
   const rub = n => n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
   const TABS = { stock: "В наличии", pre: "Предзаказ" };
-  let cat = null, cart = {}, byId = {}, tab = "", group = "", mem = "", q = "";
+  // ?mode=stock / ?mode=pre — отдельное приложение под одну витрину (кнопки в боте); без mode — обе вкладками
+  const MODE = TABS[new URLSearchParams(location.search).get("mode")] ? new URLSearchParams(location.search).get("mode") : "";
+  const CART_KEY = MODE ? "cart_" + MODE : "cart";
+  const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+  let cat = null, cart = {}, byId = {}, tab = "", group = "", mem = "", q = "", pickup = "";
 
   if (tg) { document.documentElement.classList.add("tg"); document.body.classList.add("tg"); tg.ready(); tg.expand(); }
 
@@ -105,7 +116,31 @@
 
   const items = t => t === "stock" ? cat.stock : cat.items;
   const maxQty = it => it.qty != null ? it.qty : 50;  // в наличии — не больше остатка
-  const saveCart = () => store.set("cart", { v: cat.v, items: cart });
+  const saveCart = () => store.set(CART_KEY, { v: cat.v, items: cart });
+  const dayLabel = iso => { const d = new Date(iso + "T12:00:00"); return `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`; };
+
+  function pickupDays() {  // сегодня и 6 дней вперёд, без воскресенья — как pickup_days() в боте
+    const out = [], d = new Date();
+    for (let i = 0; out.length < 7; i++, d.setDate(d.getDate() + 1)) {
+      if (d.getDay() === 0) continue;
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      out.push([iso, i === 0 ? "сегодня" : i === 1 ? "завтра" : dayLabel(iso)]);
+    }
+    return out;
+  }
+
+  function renderPick(t) {
+    const box = $("pick"), days = pickupDays();
+    box.hidden = !t.stock;
+    if (box.hidden) return;
+    if (!days.some(([d]) => d === pickup)) pickup = days[0][0];
+    box.replaceChildren(el("span", null, "Заберу:"));
+    days.forEach(([d, label]) => {
+      const b = el("button", "chip" + (d === pickup ? " on" : ""), label);
+      b.onclick = () => { pickup = d; render(); };
+      box.append(b);
+    });
+  }
 
   function chips(box, values, current, set) {
     box.replaceChildren();
@@ -138,6 +173,7 @@
 
   function renderTabs() {
     const box = $("tabs"); box.replaceChildren();
+    if (MODE) { box.className = "title"; box.textContent = MODE === "stock" ? "В наличии в Москве" : "Предзаказ из Дубая"; return; }
     for (const [t, label] of Object.entries(TABS)) {
       const inCart = Object.keys(cart).filter(id => (id[0] === "s") === (t === "stock")).length;
       const b = el("button", "tab" + (t === tab ? " on" : ""), label + " ");
@@ -169,7 +205,8 @@
     const all = items(tab);
     $("sub").textContent = tab === "stock"
       ? `Москва, самовывоз, без предоплаты` + (cat.stock_updated ? ` · обновлено ${cat.stock_updated}` : "")
-      : `Под заказ из Дубая · предоплата ${cat.prepay_pct} %` + (cat.updated ? ` · каталог от ${cat.updated}` : "");
+      : (cat.order_until ? `Заказ до ${cat.order_until} · ` : "Под заказ из Дубая · ")
+        + `предоплата ${cat.prepay_pct} % ${cat.deadline}` + (cat.rate ? ` · курс $ ${cat.rate}` : "");
     $("closed").hidden = tab !== "pre" || !!cat.accepting || !all.length;
     chips($("groups"), [...new Set(all.map(i => i.group))], group, v => { group = v; mem = ""; });
     const inGroup = all.filter(i => !group || i.group === group);
@@ -192,6 +229,7 @@
     $("note").textContent = !t.qty ? "" : t.pre
       ? `Предоплата за предзаказ ${cat.prepay_pct} % ≈ ${rub(t.prepay)} наличными ${cat.deadline}`
       : "Из наличия — без предоплаты, самовывоз в Москве";
+    renderPick(t);
     $("bar").style.display = t.qty ? "block" : "none";
     $("go").textContent = label;
     if (tg) { if (t.qty) { tg.MainButton.setText(label); tg.MainButton.show(); } else tg.MainButton.hide(); }
@@ -200,9 +238,10 @@
   function submit() {
     const t = totals();
     if (!t.qty) return;
-    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [id, n]) });
+    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [id, n]),
+                                     pickup: t.stock ? pickup : undefined });
     const parts = [];
-    if (t.stock) parts.push(`В наличии: ${rub(t.stock)} — резерв, без предоплаты.`);
+    if (t.stock) parts.push(`В наличии: ${rub(t.stock)} — резерв без предоплаты, забрать ${dayLabel(pickup)}.`);
     if (t.pre) parts.push(`Предзаказ: ${rub(t.pre)} — предоплата ${rub(t.prepay)} наличными ${cat.deadline}.`);
     const text = `Оформить заказ на ${rub(t.sum)}?\n` + parts.join("\n");
     if (!tg) { alert("Предпросмотр вне Telegram.\n\n" + text + "\n\n" + payload); return; }
@@ -221,14 +260,15 @@
     cat = data;
     cat.items = cat.items || []; cat.stock = cat.stock || [];
     [...cat.items, ...cat.stock].forEach(i => byId[i.id] = i);
-    const saved = store.get("cart") || {};
+    const saved = store.get(CART_KEY) || {};
     for (const [id, n] of Object.entries(saved.items || {})) {
       const it = byId[id];
+      if (MODE && (id[0] === "s") !== (MODE === "stock")) continue;
       // предзаказ из старого каталога не переносим; наличие — в пределах остатка
       if (it && (id[0] === "s" || saved.v === cat.v)) cart[id] = Math.min(n, maxQty(it));
     }
     const want = store.get("tab");
-    tab = TABS[want] ? want : (cat.stock.length || !cat.items.length ? "stock" : "pre");
+    tab = MODE || (TABS[want] ? want : (cat.stock.length || !cat.items.length ? "stock" : "pre"));
     render();
   }).catch(() => { $("sub").textContent = "Не удалось загрузить каталог. Откройте ещё раз или выберите «📋 Каталог списком» в боте."; });
 })();
