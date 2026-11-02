@@ -243,7 +243,6 @@
       && words.every(w => ((i.full || i.name) + " " + (i.tag || "")).toLowerCase().includes(w)));
     const sheet = $("sheet"); sheet.replaceChildren();
     if (!shown.length) { sheet.append(el("div", "empty", all.length ? "Ничего не нашлось" : "Сейчас в наличии ничего нет")); return; }
-    const cols = el("div", "cols"); cols.append(el("span", null, "Наименование"), el("span", null, "Цена")); sheet.append(cols);
     const groups = new Map();
     shown.forEach(i => { if (!groups.has(i.model)) groups.set(i.model, []); groups.get(i.model).push(i); });
     for (const [model, list] of groups) {
