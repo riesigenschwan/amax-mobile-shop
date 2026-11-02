@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>AMAX Mobile</title>
+<script>
+  // наличие переехало на stock.html (дизайн M2-C); старые кнопки с ?mode=stock ведём туда же, с данными Telegram в #
+  if (new URLSearchParams(location.search).get("mode") === "stock") location.replace("stock.html" + location.search + location.hash);
+</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
