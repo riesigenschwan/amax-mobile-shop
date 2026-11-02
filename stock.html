@@ -253,9 +253,9 @@
     }
   }
 
-  function pickupDays() {  // сегодня и вперёд, без воскресенья — 6 дней, как pickup_days() в боте
+  function pickupDays() {  // сегодня и ещё 5 дней, без воскресенья — как pickup_days() в боте
     const out = [], d = new Date();
-    for (let i = 0; out.length < 6; i++, d.setDate(d.getDate() + 1)) {
+    for (let i = 0; i <= 5; i++, d.setDate(d.getDate() + 1)) {
       if (d.getDay() === 0) continue;
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const date = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
