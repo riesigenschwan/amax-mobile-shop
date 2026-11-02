@@ -168,7 +168,8 @@
 </div>
 <script>
 (() => {
-  const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
+  // внутри Telegram platform ≠ "unknown"; initData проверять нельзя — у кнопки внизу чата он пустой
+  const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== "unknown" ? Telegram.WebApp : null;
   const $ = id => document.getElementById(id);
   const rub = n => n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
   const plural = (n, a, b, c) => n % 10 === 1 && n % 100 !== 11 ? a : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
