@@ -136,7 +136,7 @@
         <button class="back" id="back" type="button" aria-label="Назад к прайсу">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
         </button>
-        <div><b>Заказ</b><span>наличие · Москва · без предоплаты</span></div>
+        <div><b>Заказ</b><span>наличие · Москва</span></div>
       </div>
     </div>
     <div class="tiles">
@@ -341,7 +341,7 @@
       || a.model.localeCompare(b.model, "en", { numeric: true }) || rom(a.spec) - rom(b.spec) || a.price - b.price);
     cat.stock.forEach(i => byId[i.id] = i);
     for (const [id, n] of Object.entries((store.get(CART_KEY) || {}).items || {})) if (byId[id]) cart[id] = Math.min(n, byId[id].qty || 10);
-    $("upd").textContent = cat.stock_updated ? `цены на ${cat.stock_updated}` : "самовывоз, без предоплаты";
+    $("upd").textContent = cat.stock_updated ? `цены на ${cat.stock_updated}` : "самовывоз";
     render();
   }).catch(() => { $("sheet").replaceChildren(el("div", "empty", "Не удалось загрузить прайс. Закройте и откройте ещё раз.")); });
 })();
