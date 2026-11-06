@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AMAX Mobile · предзаказ</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Раскладка 1:1 со stock.html (наличие), цвета — из макета «Мини-приложение предзаказа», тема «Синий».
+     --acc: заливка шапки, степперов, кнопки; --on / --on2: текст на ней; --soft: вкладки брендов;
+     --abg: выбранная строка и плашка условий; --aink: цветной мелкий текст на белом; --bg: фон страницы.
+     Синий с белым текстом 5,2:1 (#3B82C4 давал бы 4,06:1, поэтому шапка #2F6FAE). */
+  :root { --acc: #2F6FAE; --on: #FFFFFF; --on2: #E6F0FA; --soft: #A9CDEE; --abg: #E8F1FA; --aink: #1F5C99; --bg: #F1F4F7;
+    --ink: #141414; --muted: #5E615B; --line: #EDEEEA; --line2: #E2E4DE; --card: #FFFFFF; }
+  /* Архив тем, решение 05.11: песочная и фиолетовая сейчас не используются. Включаются классом на body
+     (body.theme-sand / body.theme-violet). Если не понадобятся — удалить. */
+  body.theme-sand { --acc: #E8913A; --on: #141414; --on2: #4A2606; --soft: #F5C58F; --abg: #FCF0E2; --aink: #8F4A0C; --bg: #F6F3EE; }
+  body.theme-violet { --acc: #7C5CC4; --on: #FFFFFF; --on2: #FFFFFF; --soft: #CBBDF0; --abg: #F0EBFA; --aink: #5B3DA6; --bg: #F4F2F8; }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.35 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .wrap { max-width: 560px; margin: 0 auto; }
+
+  .head { background: var(--acc); color: var(--on); border-radius: 0 0 28px 28px; padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .row1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .logo { display: flex; flex-direction: column; gap: 3px; flex: none; }
+  .mark { position: relative; align-self: flex-start; padding-right: 10px; color: #141414; }
+  .mark i { position: absolute; right: -4px; top: -5px; width: 26px; height: 26px; border-radius: 13px; background: #fff; }
+  .mark b { position: relative; font: 900 26px/1 Montserrat, sans-serif; color: #141414; }  /* знак AMAX всегда чёрный, как в наличии */
+  .logo small { font: 700 11px Montserrat, sans-serif; letter-spacing: .42em; color: #141414; }
+  .where { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; min-width: 0; }
+  .where b { font-size: 14px; }
+  .where span { font-size: 12px; font-weight: 500; color: var(--on2); }
+  /* условия предзаказа — главное отличие от наличия, светлая плашка с тёмным текстом */
+  .terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px 4px; border-radius: 12px; background: var(--abg); color: var(--ink); }
+  .terms:empty { display: none; }
+  .terms > div { display: flex; flex-direction: column; gap: 1px; padding: 0 10px; min-width: 0; }
+  .terms > div + div { border-left: 1px solid var(--line2); }
+  .terms small { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .terms b { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .terms.shut { display: flex; justify-content: center; padding: 10px 12px; font-size: 14px; font-weight: 700; }
+  .search { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; background: #fff; border-radius: 14px; color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 16px; color: var(--ink); }
+  .search:focus-within { box-shadow: 0 0 0 2px var(--ink); }
+  .tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; height: 36px; padding: 0 16px; border-radius: 18px; border: 0; background: var(--soft); color: var(--ink); font-weight: 600; font-size: 14px; }
+  .tab.on { background: var(--ink); color: #fff; }
+
+  main { padding: 12px 12px 120px; }
+  .sheet { background: var(--card); border-radius: 18px; padding: 0 12px 6px; }
+  .cols { display: flex; justify-content: space-between; padding: 12px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line2); }
+  .model { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 18px 0 6px; border-bottom: 2px solid var(--ink); }
+  .model b { font-size: 16px; }
+  .model span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .item { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 5px 6px; margin: 0 -6px; border-radius: 8px; }
+  .item + .item { border-top: 1px solid var(--line); }
+  .item.on { background: var(--abg); }
+  .sw { width: 10px; height: 10px; flex: none; border-radius: 5px; border: 1px solid rgba(0,0,0,.18); }
+  .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .nm span { font-size: 14px; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+  .nm small { font-size: 11px; font-weight: 600; color: var(--aink); }
+  .pr { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .add { width: 40px; height: 40px; flex: none; border-radius: 10px; border: 1px solid #D5D8D0; background: #fff; display: flex; align-items: center; justify-content: center; }
+  .step { display: flex; align-items: center; height: 40px; flex: none; border-radius: 10px; background: var(--acc); color: var(--on); }
+  .step button { width: 30px; height: 40px; border: 0; background: transparent; color: inherit; font-size: 18px; font-weight: 600; }
+  .step button:disabled { opacity: .35; cursor: default; }
+  .step b { min-width: 18px; text-align: center; font-size: 14px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 12px; }
+
+  /* приём закрыт */
+  .shut-card { background: var(--card); border-radius: 18px; padding: 28px 18px 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .shut-card .ic { width: 56px; height: 56px; border-radius: 28px; background: var(--abg); color: var(--aink); display: flex; align-items: center; justify-content: center; }
+  .shut-card h2 { margin: 4px 0 0; font-size: 18px; line-height: 1.3; text-wrap: balance; }
+  .shut-card p { margin: 0; font-size: 14px; color: var(--muted); }
+  .shut-card a { margin-top: 8px; width: 100%; height: 52px; border-radius: 14px; background: var(--ink); color: #fff; text-decoration: none; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .shut-card a i { width: 10px; height: 10px; border-radius: 5px; background: #78B954; }  /* зелёная точка — цвет наличия */
+
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); pointer-events: none; }
+  .bar > div { pointer-events: auto; max-width: 536px; margin: 0 auto; min-height: 64px; border-radius: 20px; background: var(--ink); color: #fff;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 18px; }
+  .bar > div > div { min-width: 0; }
+  .bar small { display: block; font-size: 12px; color: #B9BCB5; white-space: nowrap; }
+  .bar strong { display: block; font-size: 18px; white-space: nowrap; }
+  .bar strong span { font-size: 13px; font-weight: 500; color: #B9BCB5; }
+  .go { flex: none; height: 48px; padding: 0 16px; border-radius: 14px; border: 0; background: var(--acc); color: var(--on); font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; gap: 6px; }
+
+  /* экран заказа */
+  .ohead { background: var(--acc); color: var(--on); border-radius: 0 0 28px 28px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .back { width: 44px; height: 44px; border-radius: 14px; border: 0; background: var(--soft); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+  .otitle { display: flex; align-items: center; gap: 12px; }
+  .otitle b { display: block; font-size: 20px; }
+  .otitle span { font-size: 12px; font-weight: 500; color: var(--on2); }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tile { background: #fff; color: var(--ink); border-radius: 14px; padding: 10px 12px; }
+  .tile small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .tile b { font-size: 18px; white-space: nowrap; }
+  .tile.dark { background: var(--ink); color: #fff; }
+  .tile.dark small { color: #B9BCB5; }
+  .tile.dark b { font-size: 15px; }
+  .oline { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .oline .t { display: flex; align-items: flex-start; gap: 10px; }
+  .oline .t .sw { margin-top: 5px; }
+  .oline .t .on { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+  .oline .b { display: flex; align-items: center; justify-content: space-between; padding-left: 20px; font-size: 13px; color: var(--muted); }
+  .qty { display: flex; align-items: center; gap: 6px; color: var(--ink); }
+  .qty button { width: 40px; height: 36px; border-radius: 10px; border: 1px solid #D5D8D0; background: #fff; font-size: 18px; }
+  .qty button.plus { border: 0; background: var(--acc); color: var(--on); }
+  .qty button:disabled { opacity: .35; cursor: default; }
+  .qty b { min-width: 22px; text-align: center; font-size: 15px; }
+  .total { display: flex; justify-content: space-between; padding: 12px 0 14px; font-size: 16px; font-weight: 700; }
+  .box { background: #fff; border-radius: 18px; padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  .box h3 { margin: 0; font-size: 16px; }
+  .box p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  .prepay { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: var(--abg); }
+  .prepay span { font-size: 14px; font-weight: 600; }
+  .prepay b { font-size: 20px; white-space: nowrap; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+  .kv span { color: var(--muted); }
+  .kv b { font-weight: 600; text-align: right; }
+  .send { width: 100%; max-width: 536px; margin: 0 auto; height: 60px; border: 0; border-radius: 18px; background: var(--ink); color: #fff;
+    font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; pointer-events: auto; }
+  .send em { font-style: normal; color: var(--soft); }
+  .toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px;
+    background: var(--ink); color: #fff; font-size: 14px; z-index: 5; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="listView">
+  <header class="head">
+    <div class="row1">
+      <div class="logo" aria-label="AMAX Mobile"><div class="mark"><i></i><b>AMAX</b></div><small>MOBILE</small></div>
+      <div class="where"><b>✈️ Предзаказ из Дубая</b><span id="upd">загружаю каталог…</span></div>
+    </div>
+    <div class="terms" id="terms"></div>
+    <label class="search" id="searchBox">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Модель, память, цвет" autocomplete="off" aria-label="Поиск" enterkeyhint="search">
+    </label>
+    <div class="tabs" id="tabs"></div>
+  </header>
+  <main>
+    <div class="sheet" id="sheet"></div>
+    <div class="shut-card" id="shut" hidden>
+      <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M9.5 14.5l5 3M14.5 14.5l-5 3"/></svg></div>
+      <h2>Приём на эту неделю закрыт</h2>
+      <p>Новый каталог предзаказа появится в боте. Пока можно посмотреть наличие в Москве.</p>
+      <a href="stock.html?mode=stock" id="toStock"><i aria-hidden="true"></i>Смотреть наличие</a>
+    </div>
+  </main>
+  <div class="bar" id="bar" hidden>
+    <div>
+      <div><strong id="barSum"></strong><small id="barInfo"></small></div>
+      <button class="go" id="toOrder" type="button">Оформить
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<section id="orderView" hidden>
+  <header class="ohead">
+    <div class="row1">
+      <div class="otitle">
+        <button class="back" id="back" type="button" aria-label="Назад к прайсу">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <div><b>Предзаказ</b><span>из Дубая в Москву</span></div>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><small>Позиций</small><b id="tLines"></b></div>
+      <div class="tile"><small>Штук</small><b id="tCount"></b></div>
+      <div class="tile dark"><small>Сумма</small><b id="tSum"></b></div>
+    </div>
+  </header>
+  <main>
+    <div class="sheet">
+      <div class="cols" style="border-bottom: 2px solid var(--ink)"><span>Наименование</span><span>Сумма</span></div>
+      <div id="olines"></div>
+      <div class="total"><span id="oCount"></span><span id="oSum"></span></div>
+    </div>
+    <div class="box">
+      <div class="prepay"><span id="ppLabel"></span><b id="ppSum"></b></div>
+      <div class="kv"><span>Внести</span><b id="ppWhen"></b></div>
+      <div class="kv"><span>Остальное</span><b id="ppRest"></b></div>
+    </div>
+    <div class="box">
+      <div><h3>Получение</h3><p id="arrive"></p></div>
+    </div>
+  </main>
+  <div class="bar"><button class="send" id="send" type="button"><span>Отправить предзаказ</span><em id="sendSum"></em></button></div>
+</section>
+
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+(() => {
+  // внутри Telegram platform ≠ "unknown"; initData проверять нельзя — у кнопки внизу чата он пустой
+  const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== "unknown" ? Telegram.WebApp : null;
+  const $ = id => document.getElementById(id);
+  const rub = n => n.toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
+  const plural = (n, a, b, c) => n % 10 === 1 && n % 100 !== 11 ? a : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+  const CART_KEY = "cart_pre";  // та же корзина, что была у витрины index.html?mode=pre
+  const MAX = 50;               // предел как в боте (min(qty, 50))
+  const P = new URLSearchParams(location.search);
+  // образцы цвета: точное имя, потом по слову; неизвестный цвет — без кружка
+  const HEX = { "sky blue": "#A9C8E8", "icyblue": "#CFE3F0", "icy blue": "#CFE3F0", "navy": "#2B3A55", "awesome gray": "#8A8D91",
+    "obsidian": "#2A2A2C", "frost": "#E6ECEF", "pistachio": "#C9D8B0", "hibiscus": "#E07A8A", "fog": "#C9CBC8", "graphite": "#4A4C50",
+    "cobalt violet": "#5B5FA8", "silver shadow": "#C7C9CC", "pink gold": "#E8C7B8", "deep blue": "#2E3E5C", "mist blue": "#B8C9DA",
+    "sage": "#AFC0A2", "teal": "#7FB7B0", "ultramarine": "#5D6FD6", "canyon": "#B9876A", "berry": "#9A3B5C", "jetblack": "#1D1D1F", "blue shadow": "#5E7590" };
+  const WORD_HEX = [["black", "#1D1D1F"], ["white", "#F4F4F2"], ["silver", "#D6D7D9"], ["gray", "#8A8D91"], ["grey", "#8A8D91"],
+    ["blue", "#7FA7D9"], ["green", "#8DBF8B"], ["mint", "#BFE3D0"], ["pink", "#F2B8C6"], ["violet", "#B9A7E0"], ["purple", "#B9A7E0"],
+    ["lavender", "#C9B8EA"], ["lilac", "#C9B8EA"], ["gold", "#D8C08A"], ["titanium", "#A7A39B"], ["yellow", "#F2DB72"], ["red", "#D9534F"], ["orange", "#F0A04B"], ["cream", "#EFE6D2"]];
+  const swatch = c => { const k = (c || "").toLowerCase(); if (HEX[k]) return HEX[k]; const w = WORD_HEX.find(([x]) => k.includes(x)); return w ? w[1] : ""; };
+
+  let cat = null, byId = {}, cart = {}, brand = "", q = "", view = "list";
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* без памяти — не страшно */ } },
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const svgPlus = () => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("width", "16"); s.setAttribute("height", "16"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("aria-hidden", "true");
+    s.innerHTML = '<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>'; return s; };
+  const save = () => store.set(CART_KEY, { v: cat.v, items: cart });
+  const haptic = () => { if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); };
+  const nameOf = it => [it.model, it.spec, it.color].filter(Boolean).join(" ") || it.name;
+
+  function setQty(id, n) {
+    if (!byId[id]) return;
+    if (n <= 0) delete cart[id]; else cart[id] = Math.min(n, MAX);
+    save(); haptic(); render();
+  }
+
+  function totals() {
+    let lines = 0, count = 0, sum = 0;
+    for (const [id, n] of Object.entries(cart)) { const it = byId[id]; if (!it) continue; lines++; count += n; sum += n * it.price; }
+    const prepay = Math.ceil(sum * cat.prepay_pct / 100 / 100) * 100;  // как в боте: вверх до 100 ₽
+    return { lines, count, sum, prepay };
+  }
+
+  function stepper(it, n) {
+    const s = el("div", "step"), minus = el("button", null, "−"), num = el("b", null, String(n)), plus = el("button", null, "+");
+    minus.type = plus.type = "button";
+    minus.setAttribute("aria-label", "Меньше"); plus.setAttribute("aria-label", "Больше");
+    minus.onclick = () => setQty(it.id, n - 1); plus.onclick = () => setQty(it.id, n + 1);
+    plus.disabled = n >= MAX;
+    s.append(minus, num, plus);
+    return s;
+  }
+
+  function itemRow(it) {
+    const n = cart[it.id] || 0, r = el("div", "item" + (n ? " on" : ""));
+    const hex = swatch(it.color);
+    const sw = el("span", "sw"); if (hex) sw.style.background = hex; else sw.style.visibility = "hidden";
+    const nm = el("div", "nm"); nm.append(el("span", null, nameOf(it)));
+    if (it.stock_price > it.price) nm.append(el("small", null, `дешевле наличия на ${rub(it.stock_price - it.price)}`));
+    r.append(sw, nm, el("span", "pr", rub(it.price)));
+    if (n) r.append(stepper(it, n));
+    else { const a = el("button", "add"); a.type = "button"; a.setAttribute("aria-label", "Добавить"); a.append(svgPlus()); a.onclick = () => setQty(it.id, 1); r.append(a); }
+    return r;
+  }
+
+  function renderHead() {
+    $("upd").textContent = (cat.updated ? `неделя от ${cat.updated}` : "") + (cat.pre_rate ? ` · курс $ ${cat.pre_rate}` : "");
+    const terms = $("terms"); terms.replaceChildren(); terms.classList.toggle("shut", !cat.accepting);
+    if (!cat.accepting) { terms.append(el("span", null, "Приём закрыт")); return; }
+    const part = (label, val) => { const d = el("div"); d.append(el("small", null, label), el("b", null, val)); return d; };
+    terms.append(part("Заказ до", cat.order_until || "—"), part("Предоплата", `${cat.prepay_pct} %`), part("Внести до", cat.prepay_until || "—"));
+  }
+
+  function renderList() {
+    const open = !!cat.accepting;
+    $("searchBox").hidden = $("tabs").hidden = $("sheet").hidden = !open;
+    $("shut").hidden = open;
+    if (!open) return;
+    const all = cat.items;
+    const brands = [...new Set(all.map(i => i.brand))];
+    const tabs = $("tabs"); tabs.replaceChildren();
+    ["", ...brands].forEach(b => {
+      const t = el("button", "tab" + (b === brand ? " on" : ""), b || "Все"); t.type = "button";
+      t.setAttribute("aria-pressed", String(b === brand));
+      t.onclick = () => { brand = b; render(); window.scrollTo(0, 0); };
+      tabs.append(t);
+    });
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = all.filter(i => (!brand || i.brand === brand) && words.every(w => i.name.toLowerCase().includes(w)));
+    const sheet = $("sheet"); sheet.replaceChildren();
+    if (!shown.length) { sheet.append(el("div", "empty", all.length ? "Ничего не нашлось" : "Каталог предзаказа пока не опубликован")); return; }
+    const groups = new Map();
+    shown.forEach(i => { if (!groups.has(i.model)) groups.set(i.model, []); groups.get(i.model).push(i); });
+    for (const [model, list] of groups) {
+      const h = el("div", "model"); h.append(el("b", null, model), el("span", null, list.length + " " + plural(list.length, "вариант", "варианта", "вариантов")));
+      sheet.append(h);
+      list.forEach(it => sheet.append(itemRow(it)));
+    }
+  }
+
+  function renderOrder() {
+    const t = totals();
+    $("tLines").textContent = t.lines; $("tCount").textContent = t.count; $("tSum").textContent = rub(t.sum);
+    $("oCount").textContent = `Итого · ${t.count} шт`; $("oSum").textContent = rub(t.sum); $("sendSum").textContent = rub(t.sum);
+    $("ppLabel").textContent = `Предоплата ${cat.prepay_pct} %`; $("ppSum").textContent = rub(t.prepay);
+    $("ppWhen").textContent = `наличными ${cat.deadline}`; $("ppRest").textContent = `${rub(t.sum - t.prepay)} при получении`;
+    $("arrive").textContent = "Москва · точную дату пришлём в боте";
+    const box = $("olines"); box.replaceChildren();
+    for (const [id, n] of Object.entries(cart)) {
+      const it = byId[id]; if (!it) continue;
+      const line = el("div", "oline"), top = el("div", "t"), bot = el("div", "b");
+      const sw = el("span", "sw"), hex = swatch(it.color); if (hex) sw.style.background = hex; else sw.style.visibility = "hidden";
+      top.append(sw, el("span", "on", nameOf(it)), el("b", "pr", rub(it.price * n)));
+      const qty = el("div", "qty"), minus = el("button", null, "−"), plus = el("button", "plus", "+");
+      minus.type = plus.type = "button"; minus.setAttribute("aria-label", "Меньше"); plus.setAttribute("aria-label", "Больше");
+      minus.onclick = () => setQty(id, n - 1); plus.onclick = () => setQty(id, n + 1); plus.disabled = n >= MAX;
+      qty.append(minus, el("b", null, String(n)), plus);
+      bot.append(el("span", null, `${rub(it.price)} × ${n} шт`), qty);
+      line.append(top, bot); box.append(line);
+    }
+    if (!t.count) show("list");
+  }
+
+  function show(v) {
+    view = v;
+    $("listView").hidden = v !== "list"; $("orderView").hidden = v !== "order";
+    if (tg) { if (v === "order") tg.BackButton.show(); else tg.BackButton.hide(); }
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  function render() {
+    if (!cat) return;
+    renderHead();
+    const t = totals();
+    if (view === "list") {
+      renderList();
+      $("bar").hidden = !t.count || !cat.accepting;
+      $("barInfo").textContent = `предоплата ${cat.prepay_pct} %: ${rub(t.prepay)}`;
+      $("barSum").replaceChildren(rub(t.sum), el("span", null, ` · ${t.count} шт`));
+    } else renderOrder();
+  }
+
+  let toastTimer = 0;
+  function toast(text) { const b = $("toast"); b.textContent = text; b.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => b.hidden = true, 2600); }
+
+  function submit() {
+    const t = totals(); if (!t.count) return;
+    // контракт с ботом — как у витрины index.html в режиме pre: {v, items: [[id, qty], ...]}; комментарий бот для предзаказа не читает
+    const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart) });
+    if (!tg) { toast("Вне Telegram заказ не отправляется"); console.log("payload", payload); return; }
+    tg.showConfirm(`Оформить предзаказ на ${rub(t.sum)}?\nПредоплата ${rub(t.prepay)} наличными ${cat.deadline}.`, ok => {
+      if (!ok) return;
+      cart = {}; save();
+      tg.sendData(payload);  // бот получает заказ, окно закрывается
+    });
+  }
+
+  $("toOrder").onclick = () => show("order");
+  $("back").onclick = () => show("list");
+  $("send").onclick = submit;
+  $("q").oninput = e => { q = e.target.value; render(); };
+  $("q").onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
+  $("toStock").href = "stock.html?mode=stock" + (P.get("v") ? "&v=" + encodeURIComponent(P.get("v")) : "");  // та же версия страницы
+
+  if (tg) {
+    tg.ready(); tg.expand();
+    try { tg.setHeaderColor("#2F6FAE"); tg.setBackgroundColor("#F1F4F7"); } catch (e) { /* старый клиент Telegram */ }
+    tg.MainButton.hide();
+    tg.BackButton.onClick(() => show("list"));
+  }
+
+  fetch("catalog.json?t=" + Date.now()).then(r => r.json()).then(data => {
+    cat = data;
+    cat.items = (cat.items || []).map(i => ({ ...i, brand: i.brand || i.group, model: i.model || i.name }));
+    cat.items.forEach(i => byId[i.id] = i);
+    const saved = store.get(CART_KEY) || {};
+    if (saved.v === cat.v) for (const [id, n] of Object.entries(saved.items || {})) if (byId[id]) cart[id] = Math.min(n, MAX);  // старый каталог не переносим
+    render();
+  }).catch(() => {
+    $("upd").textContent = "каталог не загрузился";
+    $("sheet").replaceChildren(el("div", "empty", "Каталог не загрузился. Закройте окно и откройте снова."));
+  });
+})();
+</script>
+</body>
+</html>
