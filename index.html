@@ -82,7 +82,7 @@
 <div class="top">
   <div class="tabs" id="tabs"></div>
   <div class="sub" id="sub">Загружаю каталог…</div>
-  <div class="closed" id="closed" hidden>Приём предзаказов закрыт — каталог для ознакомления.</div>
+  <div class="closed" id="closed" hidden>Приём предзаказов закрыт. Каталог только для просмотра.</div>
   <input class="search" id="q" type="search" placeholder="Поиск: S26, 512, Black…" autocomplete="off">
   <div class="chips" id="groups"></div>
   <div class="chips" id="mems"></div>
@@ -230,8 +230,8 @@
     const t = totals();
     const label = t.qty ? `Оформить · ${t.qty} шт · ${rub(t.sum)}` : "";
     $("note").textContent = !t.qty ? "" : t.pre
-      ? `Предоплата за предзаказ ${cat.prepay_pct} % ≈ ${rub(t.prepay)} наличными ${cat.deadline}`
-      : "Из наличия — без предоплаты, самовывоз в Москве";
+      ? `Предоплата за предзаказ ${cat.prepay_pct} %: около ${rub(t.prepay)} наличными ${cat.deadline}`
+      : "Из наличия: без предоплаты, самовывоз в Москве";
     renderPick(t);
     $("bar").style.display = t.qty ? "block" : "none";
     $("go").textContent = label;
@@ -244,8 +244,8 @@
     const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart).map(([id, n]) => [id, n]),
                                      pickup: t.stock ? pickup : undefined });
     const parts = [];
-    if (t.stock) parts.push(`В наличии: ${rub(t.stock)} — резерв без предоплаты, забрать ${dayLabel(pickup)}.`);
-    if (t.pre) parts.push(`Предзаказ: ${rub(t.pre)} — предоплата ${rub(t.prepay)} наличными ${cat.deadline}.`);
+    if (t.stock) parts.push(`В наличии: ${rub(t.stock)}, резерв без предоплаты, забрать ${dayLabel(pickup)}.`);
+    if (t.pre) parts.push(`Предзаказ: ${rub(t.pre)}, предоплата ${rub(t.prepay)} наличными ${cat.deadline}.`);
     const text = `Оформить заказ на ${rub(t.sum)}?\n` + parts.join("\n");
     if (!tg) { alert("Предпросмотр вне Telegram.\n\n" + text + "\n\n" + payload); return; }
     tg.showConfirm(text, ok => {
@@ -273,7 +273,7 @@
     const want = store.get("tab");
     tab = MODE || (TABS[want] ? want : (cat.stock.length || !cat.items.length ? "stock" : "pre"));
     render();
-  }).catch(() => { $("sub").textContent = "Не удалось загрузить каталог. Откройте ещё раз или выберите «📋 Каталог списком» в боте."; });
+  }).catch(() => { $("sub").textContent = "Каталог не загрузился. Откройте его снова или выберите «📋 Каталог списком» в боте."; });
 })();
 </script>
 </body>
