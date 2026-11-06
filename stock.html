@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>AMAX Mobile — наличие</title>
+<title>AMAX Mobile · наличие</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -316,7 +316,7 @@
   function submit() {
     const t = totals(); if (!t.count) return;
     const payload = JSON.stringify({ v: cat.v, items: Object.entries(cart), pickup, comment: $("comment").value.trim() });
-    if (!tg) { alert("Предпросмотр вне Telegram — заказ не отправлен.\n\n" + payload); return; }
+    if (!tg) { alert("Предпросмотр вне Telegram: заказ не отправлен.\n\n" + payload); return; }
     cart = {}; save();
     tg.sendData(payload);  // бот получает заказ и присылает подтверждение, окно закрывается
   }
@@ -343,7 +343,7 @@
     for (const [id, n] of Object.entries((store.get(CART_KEY) || {}).items || {})) if (byId[id]) cart[id] = Math.min(n, byId[id].qty || 10);
     $("upd").textContent = cat.stock_updated ? `цены на ${cat.stock_updated}` : "самовывоз";
     render();
-  }).catch(() => { $("sheet").replaceChildren(el("div", "empty", "Не удалось загрузить прайс. Закройте и откройте ещё раз.")); });
+  }).catch(() => { $("sheet").replaceChildren(el("div", "empty", "Прайс не загрузился. Закройте окно и откройте снова.")); });
 })();
 </script>
 </body>
